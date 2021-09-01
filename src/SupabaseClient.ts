@@ -74,7 +74,7 @@ export default class SupabaseClient {
    * Supabase Storage allows you to manage user-generated content, such as photos or videos.
    */
   get storage() {
-    return new SupabaseStorageClient(this.storageUrl, this._getHeaders())
+    return new SupabaseStorageClient(this.storageUrl, this._getHeadersWithAuth())
   }
 
   /**
@@ -85,7 +85,7 @@ export default class SupabaseClient {
   from<T = any>(table: string): SupabaseQueryBuilder<T> {
     const url = `${this.restUrl}/${table}`
     return new SupabaseQueryBuilder<T>(url, {
-      headers: this._getHeaders(),
+      headers: this._getHeadersWithAuth(),
       schema: this.schema,
       realtime: this.realtime,
       table,
@@ -152,7 +152,7 @@ export default class SupabaseClient {
   }: SupabaseClientOptions) {
     return new SupabaseAuthClient({
       url: this.authUrl,
-      headers: this._getHeaders({ allowAccessToken: false }),
+      headers: this._getHeadersWithAuth({ allowAccessToken: false }),
       autoRefreshToken,
       persistSession,
       detectSessionInUrl,
@@ -163,18 +163,19 @@ export default class SupabaseClient {
   private _initRealtimeClient(options?: RealtimeClientOptions) {
     return new RealtimeClient(this.realtimeUrl, {
       ...options,
+      headers: { ...this.headers, ...options?.headers },
       params: { ...options?.params, apikey: this.supabaseKey },
     })
   }
 
   private _initPostgRESTClient() {
     return new PostgrestClient(this.restUrl, {
-      headers: this._getHeaders(),
+      headers: this._getHeadersWithAuth(),
       schema: this.schema,
     })
   }
 
-  private _getHeaders({
+  private _getHeadersWithAuth({
     allowAccessToken = true,
   }: {
     allowAccessToken?: boolean
