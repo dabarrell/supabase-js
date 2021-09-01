@@ -32,6 +32,7 @@ export default class SupabaseClient {
   protected authUrl: string
   protected storageUrl: string
   protected realtime: RealtimeClient
+  protected headers: { [key: string]: string }
 
   /**
    * Create a new client for use in the browser.
@@ -58,6 +59,7 @@ export default class SupabaseClient {
     this.authUrl = `${supabaseUrl}/auth/v1`
     this.storageUrl = `${supabaseUrl}/storage/v1`
     this.schema = settings.schema
+    this.headers = settings.headers
 
     this.auth = this._initSupabaseAuthClient(settings)
     this.realtime = this._initRealtimeClient(settings.realtime)
@@ -72,7 +74,7 @@ export default class SupabaseClient {
    * Supabase Storage allows you to manage user-generated content, such as photos or videos.
    */
   get storage() {
-    return new SupabaseStorageClient(this.storageUrl, this._getAuthHeaders())
+    return new SupabaseStorageClient(this.storageUrl, this._getHeaders())
   }
 
   /**
@@ -83,7 +85,7 @@ export default class SupabaseClient {
   from<T = any>(table: string): SupabaseQueryBuilder<T> {
     const url = `${this.restUrl}/${table}`
     return new SupabaseQueryBuilder<T>(url, {
-      headers: this._getAuthHeaders(),
+      headers: this._getHeaders(),
       schema: this.schema,
       realtime: this.realtime,
       table,
@@ -147,15 +149,10 @@ export default class SupabaseClient {
     persistSession,
     detectSessionInUrl,
     localStorage,
-    headers,
   }: SupabaseClientOptions) {
-    const authHeaders = {
-      Authorization: `Bearer ${this.supabaseKey}`,
-      apikey: `${this.supabaseKey}`,
-    }
     return new SupabaseAuthClient({
       url: this.authUrl,
-      headers: { ...headers, ...authHeaders },
+      headers: this._getHeaders({ allowAccessToken: false }),
       autoRefreshToken,
       persistSession,
       detectSessionInUrl,
@@ -172,17 +169,25 @@ export default class SupabaseClient {
 
   private _initPostgRESTClient() {
     return new PostgrestClient(this.restUrl, {
-      headers: this._getAuthHeaders(),
+      headers: this._getHeaders(),
       schema: this.schema,
     })
   }
 
-  private _getAuthHeaders(): { [key: string]: string } {
-    const headers: { [key: string]: string } = {}
-    const authBearer = this.auth.session()?.access_token ?? this.supabaseKey
-    headers['apikey'] = this.supabaseKey
-    headers['Authorization'] = `Bearer ${authBearer}`
-    return headers
+  private _getHeaders({
+    allowAccessToken = true,
+  }: {
+    allowAccessToken?: boolean
+  } = {}): { [key: string]: string } {
+    const authBearer = allowAccessToken
+      ? this.auth.session()?.access_token ?? this.supabaseKey
+      : this.supabaseKey
+
+    return {
+      ...this.headers,
+      apikey: this.supabaseKey,
+      Authorization: `Bearer ${authBearer}`,
+    }
   }
 
   private _closeChannel(subscription: RealtimeSubscription) {
